@@ -2,29 +2,8 @@ import streamlit as st
 import numpy as np
 import matplotlib.pyplot as plt
 
-# --- 頁面設定 ---
+# --- 頁面設定 (使用 Light Mode 視覺感) ---
 st.set_page_config(page_title="TwinWin Payoff", layout="wide")
-plt.style.use('dark_background')
-
-# --- 自定義 CSS：讓 Metric 數字變大，間距加寬 ---
-st.markdown("""
-    <style>
-    [data-testid="stMetricValue"] {
-        font-size: 50px !important;
-        font-weight: bold !important;
-        color: #00ffcc !important;
-    }
-    [data-testid="stMetricLabel"] {
-        font-size: 20px !important;
-    }
-    .stMetric {
-        background-color: #1e1e1e;
-        padding: 20px;
-        border-radius: 10px;
-        border: 1px solid #333;
-    }
-    </style>
-    """, unsafe_allow_html=True)
 
 # --- 側邊欄參數 ---
 with st.sidebar:
@@ -36,55 +15,66 @@ with st.sidebar:
 
 # --- 主頁面 ---
 st.title("💹 TwinWin Interactive Dashboard")
+
+# --- 1. Live Scenario 滑桿 (放在圖表上方，符合你操作邏輯) ---
+market_perf = st.select_slider(
+    "🎮 **Live Market Simulation**: Drag to see how payoff changes (%)",
+    options=list(range(20, 151)),
+    value=84
+)
+market_change = market_perf / 100
+
 st.markdown("---")
 
 # --- 💡 計算與繪圖 ---
+# 曲線背景使用 dark_background 維持專業感，或是你可以註解掉改用白底
+plt.style.use('dark_background') 
+
 perf_range = np.linspace(0, 1.5, 500)
 payoff_curve = [
     (p / strike_price * 100) if p < eki_barrier else (100 + abs(p - 1.0) * 100) 
     for p in perf_range
 ]
 
-# --- 1. 大圖顯示 ---
-fig, ax = plt.subplots(figsize=(16, 7)) # 再加高一點
-ax.plot(perf_range * 100, payoff_curve, color='#00ffcc', linewidth=5, alpha=0.9)
-ax.axvspan(0, eki_barrier*100, color='red', alpha=0.15)
-ax.axvline(x=100, color='white', linestyle='--', alpha=0.3)
-ax.axhline(y=100, color='white', linestyle='--', alpha=0.3)
-
-ax.set_title(f"TwinWin Payoff Curve (Strike: {strike_price*100:.2f}%)", fontsize=18, pad=20, color='white')
-ax.set_xlabel("Underlying Performance (%)", color='gray', fontsize=14)
-ax.set_ylabel("Payoff Value", color='gray', fontsize=14)
-ax.grid(True, alpha=0.05)
-
-# --- 2. Live Scenario 滑桿 ---
-market_perf = st.select_slider(
-    "🎮 **Live Market Simulation**: Drag to see how payoff changes with stock performance (%)",
-    options=list(range(20, 151)),
-    value=84
-)
-market_change = market_perf / 100
-
-# 在圖上畫點
+# 當前點計算
 current_payoff = (market_change / strike_price * 100) if market_change < eki_barrier else (100 + abs(market_change - 1.0) * 100)
+
+# 繪圖
+fig, ax = plt.subplots(figsize=(16, 6))
+ax.plot(perf_range * 100, payoff_curve, color='#00ffcc', linewidth=5, alpha=0.9)
+ax.axvspan(0, eki_barrier*100, color='red', alpha=0.2) # 紅色警戒區
+ax.axvline(x=100, color='white', linestyle='--', alpha=0.3)
 ax.scatter([market_perf], [current_payoff], color='yellow', s=300, zorder=15, edgecolor='black')
+
+ax.set_title(f"TwinWin Payoff Curve (Strike: {strike_price*100:.2f}%)", fontsize=16)
+ax.grid(True, alpha=0.1)
+
 st.pyplot(fig, use_container_width=True)
 
 st.markdown("---")
 
-# --- 3. 數據看板 (CSS 加大版) ---
-col1, col2, col3 = st.columns(3)
+# --- 2. 原始格式但「特大字體」的數據看板 ---
+# 我們使用 HTML/Markdown 來達成比原本 Metric 更大的視覺效果
 
-with col1:
-    st.metric("Underlying Price", f"{market_perf}%", delta=f"{market_perf-100}%")
+c1, c2 = st.columns(2)
 
-with col2:
-    # 這裡就是你要的巨大數字
-    st.metric("Final Payoff", f"{current_payoff:.2f}", delta=f"{current_payoff-100:.2f}%")
+with c1:
+    st.markdown("### Underlying Price")
+    st.markdown(f"<h1 style='font-size: 80px; color: #31333F;'>{market_perf}%</h1>", unsafe_allow_html=True)
+    delta = market_perf - 100
+    color = "red" if delta < 0 else "green"
+    st.markdown(f"<p style='font-size: 25px; color: {color};'>{'↓' if delta < 0 else '↑'} {abs(delta)}% from Initial</p>", unsafe_allow_html=True)
 
-with col3:
-    status_msg = "Safe Zone" if market_change >= eki_barrier else "KI Triggered"
-    st.metric("Strategy Status", status_msg, delta=None)
+with c2:
+    st.markdown("### Final Payoff")
+    # 這裡就是你要的巨大字體，顏色用醒目的青藍色
+    st.markdown(f"<h1 style='font-size: 100px; color: #008080;'>{current_payoff:.2f}</h1>", unsafe_allow_html=True)
+    payoff_delta = current_payoff - 100
+    p_color = "red" if payoff_delta < 0 else "green"
+    st.markdown(f"<p style='font-size: 25px; color: {p_color};'>Expected Return: {payoff_delta:+.2f}%</p>", unsafe_allow_html=True)
 
 st.markdown("---")
-st.info(f"💡 Strategy Logic: At {market_perf}%, you are earning {abs(market_perf-100) if market_change >= eki_barrier else 'stock value'} payoff.")
+if market_change < eki_barrier:
+    st.error(f"⚠️ Warning: EKI Barrier Triggered! Physical delivery at strike {strike_price*100:.2f}%")
+else:
+    st.success("✅ Safe Zone: Enjoying Double Win (Bullish & Bearish) returns.")
