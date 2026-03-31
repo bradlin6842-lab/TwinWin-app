@@ -25,7 +25,7 @@ market_change = market_perf / 100
 
 st.markdown("---")
 
-# --- 💡 計算與繪圖 ---
+# --- 💡 核心繪圖區 (大大大版本) ---
 perf_range = np.linspace(0, 1.5, 500)
 payoff_curve = [
     (p / strike_price * 100) if p < eki_barrier else (100 + abs(p - 1.0) * 100) 
@@ -33,26 +33,40 @@ payoff_curve = [
 ]
 current_payoff = (market_change / strike_price * 100) if market_change < eki_barrier else (100 + abs(market_change - 1.0) * 100)
 
-# 繪圖 (調整比例)
-fig, ax = plt.subplots(figsize=(16, 6))
-ax.plot(perf_range * 100, payoff_curve, color='#00ffcc', linewidth=4, alpha=0.9)
-ax.axvspan(0, eki_barrier*100, color='#ff4444', alpha=0.15)
-ax.axvline(x=100, color='white', linestyle='--', alpha=0.2)
-ax.scatter([market_perf], [current_payoff], color='yellow', s=200, zorder=10)
+# --- 這裡就是關鍵：figsize 拉到 (16, 10) ---
+fig, ax = plt.subplots(figsize=(16, 10)) 
 
-ax.set_title("Expected Payoff Curve", fontsize=14, color='gray')
-ax.grid(True, alpha=0.05)
+# 畫出 TwinWin 獲利曲線
+ax.plot(perf_range * 100, payoff_curve, color='#00ffcc', linewidth=6, alpha=0.9) # 線條也加粗
+
+# 背景警戒區顏色加重一點點，讓大圖更有層次感
+ax.axvspan(0, eki_barrier*100, color='#ff4444', alpha=0.2) 
+
+# 畫出 100% 參考線
+ax.axvline(x=100, color='white', linestyle='--', alpha=0.3, linewidth=2)
+ax.axhline(y=100, color='white', linestyle='--', alpha=0.3, linewidth=2)
+
+# 畫出黃色大點 (增加到 s=500)
+ax.scatter([market_perf], [current_payoff], color='yellow', s=500, zorder=10, edgecolor='white', linewidth=2)
+
+# 圖表內部文字放大，適配大圖
+ax.set_title("Expected Payoff Curve", fontsize=24, color='white', pad=30)
+ax.tick_params(axis='both', which='major', labelsize=18, colors='gray')
+ax.set_xlabel("Underlying Performance (%)", fontsize=20, color='gray', labelpad=20)
+ax.set_ylabel("Payoff Value", fontsize=20, color='gray', labelpad=20)
+ax.grid(True, alpha=0.1)
+
+# 使用 use_container_width=True 確保它填滿視窗
 st.pyplot(fig, use_container_width=True)
 
 st.markdown("---")
 
-# --- 2. 自定義專業級黑格看板 ---
-# 這裡透過 CSS 控制：格子上下撐大 (padding)，文字大小適中
+# --- 2. 自定義專業級黑格看板 (保持專業質感) ---
 st.markdown("""
     <style>
     .metric-container {
         background-color: #161616;
-        padding: 40px 20px; /* 上下 40px 拉大格子 */
+        padding: 50px 20px; /* 這裡也稍微加高一點 */
         border-radius: 12px;
         border: 1px solid #333;
         text-align: center;
@@ -60,25 +74,24 @@ st.markdown("""
     }
     .metric-label {
         color: #888;
-        font-size: 16px;
+        font-size: 18px;
         text-transform: uppercase;
-        letter-spacing: 1px;
-        margin-bottom: 10px;
+        letter-spacing: 2px;
+        margin-bottom: 15px;
     }
     .metric-value {
         color: #00ffcc;
-        font-size: 48px; /* 專業適中的大小 */
+        font-size: 52px; 
         font-weight: 600;
         font-family: 'Courier New', Courier, monospace;
     }
     .metric-delta {
-        font-size: 18px;
-        margin-top: 8px;
+        font-size: 20px;
+        margin-top: 10px;
     }
     </style>
     """, unsafe_allow_html=True)
 
-# 渲染數據格
 c1, c2, c3 = st.columns(3)
 
 with c1:
@@ -113,10 +126,7 @@ with c3:
     st.markdown(f"""
         <div class="metric-container">
             <div class="metric-label">Execution Status</div>
-            <div class="metric-value" style="color: {s_color}; font-size: 32px;">{status}</div>
+            <div class="metric-value" style="color: {s_color}; font-size: 36px;">{status}</div>
             <div class="metric-delta" style="color: gray;">Barrier at {eki_barrier*100:.0f}%</div>
         </div>
     """, unsafe_allow_html=True)
-
-st.markdown("---")
-st.caption("Internal Use Only - Private Wealth Management Terminal")
