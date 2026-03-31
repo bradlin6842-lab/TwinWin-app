@@ -3,69 +3,77 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # --- 頁面設定 ---
-st.set_page_config(page_title="TwinWin Simulator", layout="wide")
+st.set_page_config(page_title="TwinWin Dashboard", layout="wide")
 plt.style.use('dark_background')
 
-st.title("🚀 TwinWin Payoff Simulator")
-st.write("Adjust scenarios to see the 'Double Win' logic.")
-
-# --- 側邊欄參數 ---
+# --- 側邊欄：放置固定產品參數 ---
 with st.sidebar:
-    st.header("Product Parameters")
-    face_value = 100
-    # 根據你的報價單設定
+    st.header("⚙️ Product Setup")
     eki_barrier = st.slider("EKI Barrier (%)", 40, 90, 60) / 100
     strike_price = st.slider("Strike Price (%)", 40.0, 100.0, 61.95) / 100
-    
     st.markdown("---")
-    st.header("🎮 Live Scenario")
-    # 這裡就是你要的：調整標的漲跌情境
-    market_change = st.slider("Market Performance (Relative to Initial %)", 20, 150, 85) / 100
+    st.caption("Adjust static product terms here.")
 
-# --- 計算當前情境獲利 ---
+# --- 主頁面：動態情境測試 ---
+st.title("💹 TwinWin Interactive Dashboard")
+
+# 把 Live Scenario 放到主頁最上方
+st.subheader("🎮 Live Market Scenario")
+market_perf = st.select_slider(
+    "Slide to simulate Stock Performance (Relative to Initial Price %)",
+    options=list(range(20, 151)),
+    value=85
+)
+market_change = market_perf / 100
+
+st.markdown("---")
+
+# --- 計算當前邏輯 ---
 if market_change >= eki_barrier:
-    current_payoff = face_value * (1 + abs(market_change - 1.0))
-    status_text = "Safe Zone: TwinWin Active"
-    status_color = "green"
+    # TwinWin 核心：abs(1-perf)
+    profit_pct = abs(market_change - 1.0) * 100
+    current_payoff = 100 + profit_pct
+    status_msg = "✅ Safe Zone: TwinWin Active"
+    status_type = "success"
 else:
-    current_payoff = (market_change / strike_price) * face_value
-    status_text = "KI Event: Physical Delivery"
-    status_color = "red"
+    # 觸發 KI
+    current_payoff = (market_change / strike_price) * 100
+    status_msg = "⚠️ KI Event: Forced Delivery"
+    status_type = "error"
 
-# --- 核心繪圖邏輯 ---
+# --- 數據看板 ---
+col1, col2, col3 = st.columns(3)
+with col1:
+    st.metric("Market Price", f"{market_perf}%", delta=f"{market_perf-100}%", delta_color="normal")
+with col2:
+    # 這裡顯示最終拿回多少錢
+    st.metric("Final Payoff", f"{current_payoff:.2f}", delta=f"{current_payoff-100:.2f}%")
+with col3:
+    st.info(f"**Strategy Status**\n\n{status_msg}")
+
+# --- 繪圖 ---
 perf_range = np.linspace(0, 1.5, 500)
-payoff_curve = []
+payoff_curve = [
+    (p / strike_price * 100) if p < eki_barrier else (100 + abs(p - 1.0) * 100) 
+    for p in perf_range
+]
 
-for p in perf_range:
-    if p >= eki_barrier:
-        payoff_curve.append(face_value * (1 + abs(p - 1.0)))
-    else:
-        payoff_curve.append((p / strike_price) * face_value)
+fig, ax = plt.subplots(figsize=(12, 5))
+ax.plot(perf_range * 100, payoff_curve, color='#00ffcc', linewidth=3, alpha=0.8)
 
-fig, ax = plt.subplots(figsize=(10, 5))
-ax.plot(perf_range * 100, payoff_curve, color='#00ffcc', linewidth=2)
-# 標記當前情境點
-ax.scatter([market_change * 100], [current_payoff], color='yellow', s=100, zorder=5, label='Current Scenario')
+# 畫出當前情境點 (黃色大點)
+ax.scatter([market_perf], [current_payoff], color='yellow', s=150, zorder=10, label='Current Spot')
+# 畫出 EKI 警戒區域
+ax.axvspan(0, eki_barrier*100, color='red', alpha=0.1, label='KI Danger Zone')
 ax.axvline(x=100, color='white', linestyle='--', alpha=0.3)
-ax.axvline(x=eki_barrier*100, color='#ff4444', label='EKI Barrier')
 
-# 使用英文標籤避免亂碼
-ax.set_xlabel("Underlying Performance (%)")
-ax.set_ylabel("Payoff Value")
+ax.set_xlabel("Underlying Performance (%)", color='gray')
+ax.set_ylabel("Payoff Value", color='gray')
 ax.legend()
 st.pyplot(fig)
 
-# --- 儀表板顯示 ---
-st.markdown(f"### Current Market Scenario: **{market_change*100:.1f}%**")
-c1, c2 = st.columns(2)
-with c1:
-    st.metric("Final Payoff Value", f"{current_payoff:.2f}")
-with c2:
-    if market_change < 1.0 and market_change >= eki_barrier:
-        st.success(f"Profit from Drop: +{abs(1.0 - market_change)*100:.1f}%")
-    elif market_change >= 1.0:
-        st.success(f"Profit from Rise: +{(market_change - 1.0)*100:.1f}%")
-    else:
-        st.error("Loss due to KI Event")
-
-st.info(f"Status: {status_text}")
+st.markdown("""
+### 💡 How to Read this Chart:
+* **V-Shape Zone:** Between the Red Zone and 150%, you profit from **both** upside and downside.
+* **Red Zone:** If the stock drops below the EKI Barrier, the 'Double Win' disappears, and you receive stocks at the Strike Price.
+""")
